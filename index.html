@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script type="text/javascript" src="js/screen.js"></script>
+		<script type="text/javascript" src="js/packet.js"></script>
+		<style>
+			body{
+				margin:0px 0px 0px 0px;
+			}
+			canvas{
+				width:100%;
+				height:100%;
+				position:absolute;
+				left:0px;
+				top:0px;
+			}
+		</style>
+	</head>
+	<body>
+		<script type="text/javascript">
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			window.onload = function(){
+				prepareImage();
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			var packets = [];
+
+			function masterLoop(){
+				contextActive.clearRect(0,0,canvasActive.width,canvasActive.height);
+				for(var i=0;i<screens.length;i++){
+					screens[i].update();
+				}
+				for(var n=0;n<packets.length;n++){
+					packets[n].update();
+					if(packets[n].arrived){
+						packetArrival(packets[n]);
+						var p = packets.splice(n,1);
+						n--;
+					}
+					else{
+						packets[n].paint();
+					}
+				}
+				requestAnimFrame(masterLoop);
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			function packetArrival(packet){
+				for(var d=0;d<screens.length;d++){
+					if(screens[d].name===packet.destName){
+						screens[d].addPacket(packet.index);
+					}
+				}
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			var imgBuffer;
+			var sections = [];
+
+			var xDim = 10;
+			var yDim;
+
+			function prepareImage(){
+
+				var imageWidth = 100;
+
+				imgBuffer = document.createElement('canvas');
+				var img = document.createElement('img');
+				img.src="images/thing.jpg";
+				img.onload = function(){
+					imgBuffer.width = imageWidth;
+					imgBuffer.height = Math.round(imageWidth*(img.height/img.width));
+					imgBuffer.getContext('2d').drawImage(img,0,0,imgBuffer.width,imgBuffer.height);
+
+					var imgRatio = img.height/img.width;
+					yDim = Math.round(xDim*imgRatio);
+
+					var xStep = Math.round(imgBuffer.width/xDim);
+					var yStep = Math.round(imgBuffer.height/yDim);
+
+					for(var x=0;x<xDim;x++){
+						var xPos = x*xStep;
+						for(var y=0;y<yDim;y++){
+							var index = x+(y*xDim);
+							var yPos = y*yStep;
+							var piece = document.createElement('canvas');
+							piece.width = xStep;
+							piece.height = yStep;
+							piece.getContext('2d').putImageData( imgBuffer.getContext('2d').getImageData(xPos,yPos,xStep,yStep) ,0,0 );
+							sections[index] = piece;
+						}
+					}
+					makeTorrentFile();
+					prepareCanvas();
+					makeScreen(.5,.5,true);
+					masterLoop();
+				}
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			var torrent;
+			var torrentContext;
+
+			function makeTorrentFile(){
+				torrent = document.createElement('canvas');
+				torrent.width = imgBuffer.width;
+				torrent.height = imgBuffer.height;
+				torrentContext = torrent.getContext('2d');
+				var bufferData = imgBuffer.getContext('2d').getImageData(0,0,imgBuffer.width,imgBuffer.height);
+				for(var i=0;i<bufferData.data.length;i+=4){
+					var r = bufferData.data[i];
+					var g = bufferData.data[i+1];
+					var b = bufferData.data[i+2];
+					var sum = r+b+g;
+					var value = Math.floor(r*.3)+Math.floor(g*.59)+Math.floor(b*.11);
+					for(var n=0;n<3;n++){
+						bufferData.data[i+n] = value;
+					}
+					bufferData.data[i+3] = 50;
+				}
+				torrentContext.putImageData(bufferData,0,0);
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			var canvasStatic;
+			var contextStatic;
+			var canvasActive;
+			var contextActive;
+
+			function prepareCanvas(){
+				canvasStatic = document.createElement('canvas');
+				canvasActive = document.createElement('canvas');
+				resize();
+				contextStatic = canvasStatic.getContext('2d');
+				contextActive = canvasActive.getContext('2d');
+				document.body.appendChild(canvasStatic);
+				document.body.appendChild(canvasActive);
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			var screens = [];
+			var screenScale = 1;
+			var screenName = 0;
+
+			function makeScreen(x,y,full){
+				var s = new Screen(x,y,screenScale,full,screenName);
+				screens.push(s);
+				screenName++;
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			var center = {
+				'x':undefined,
+				'y':undefined
+			};
+
+			//window.onresize = resize;
+
+			function resize(){
+				var ratio = window.innerHeight/window.innerWidth;
+				if(canvasActive){
+
+					canvasActive.width = 1000;
+					canvasActive.height = canvasActive.width*ratio;
+					canvasStatic.width = canvasActive.width;
+					canvasStatic.height = canvasActive.height;
+
+					center.x = canvasActive.width/2;
+					center.y = canvasActive.height/2;
+				}
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			window.onclick = function(e){
+				var relX = e.x/window.innerWidth;
+				var relY = e.y/window.innerHeight;
+				makeScreen(relX,relY,false);
+			}
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+			window.requestAnimFrame = (function(){
+				return  window.requestAnimationFrame       ||
+					window.webkitRequestAnimationFrame ||
+					window.mozRequestAnimationFrame    ||
+					function( callback ){
+						window.setTimeout(callback, 1000 / 60);
+					};
+			})();
+
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+			//////////////////////////////////////////
+
+		</script>
+	</body>
+</html>
